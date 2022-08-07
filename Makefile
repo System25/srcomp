@@ -20,11 +20,9 @@ ALL: srcomp
 
 DEPENDENCIES=\
 	wseparator.o\
-	wseparator.h\
+	wseparator.h
 #	split2b.o\
 #	split2b.h\
-        dynarray.h\
-	dynarray.o
 
 CFLAGS=-Wall -pg
 LDFLAGS=
