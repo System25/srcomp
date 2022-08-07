@@ -96,8 +96,9 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
                   bool use_previous_byte) {
   sr_header header;
   sr_block_header block_header;
-  size_t length, bs, l;
-  size_t nblocks;
+  size_t length;
+  int bs, l;
+  int nblocks;
   int i;
   unsigned short *src;
   unsigned short *dst;
@@ -232,8 +233,9 @@ void decompress_block(unsigned short *src, unsigned short *dst, unsigned short l
 int decompress_data(FILE *infile, FILE *outfile) {
   sr_header header;
   sr_block_header block_header;
-  size_t length, bs, l;
-  size_t nblocks;
+  size_t length;
+  int bs, l;
+  int nblocks;
   int i;
   unsigned short *src;
   unsigned short *dst;

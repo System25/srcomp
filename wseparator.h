@@ -28,7 +28,7 @@
  * @param use_previous_byte Use the median value of the previous byte
  *                          to achieve a better sorting.
  */
-void separate_words(unsigned short *src, unsigned short *dst, size_t length,
+void separate_words(unsigned short *src, unsigned short *dst, int length,
                     bool use_previous_byte);
 
 
@@ -42,7 +42,7 @@ void separate_words(unsigned short *src, unsigned short *dst, size_t length,
  *                          to achieve a better sorting.
  */
 void join_words(unsigned short *src, unsigned short *dst, unsigned short last,
-                size_t length, bool use_previous_byte);
+                int length, bool use_previous_byte);
 
 
 #endif

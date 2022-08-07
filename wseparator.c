@@ -32,13 +32,13 @@ unsigned char median[NSYMBOLS];
  * Count words in an array. 
  * @param src The source data whose words will be counted.
  * @param len The number of workds in the source data.
- * @param count An array of 65536*sizeof(size_t) bytes that will
+ * @param count An array of 65536*sizeof(int) bytes that will
  *              contain the counts.
  */
-void count_words(unsigned short *src, size_t len, size_t *count) {
-  size_t i;
+void count_words(unsigned short *src, int len, int *count) {
+  int i;
 
-  memset(count, 0, NSYMBOLS*sizeof(size_t));
+  memset(count, 0, NSYMBOLS*sizeof(int));
 
   for (i = 0; i < len; i++) {
     count[ src[i] ]++;
@@ -55,13 +55,13 @@ void count_words(unsigned short *src, size_t len, size_t *count) {
 /* ======================================================================== */
 /** 
  * Calculate the indexes of the destination array. 
- * @param count An array of 65536*sizeof(size_t) bytes that will
+ * @param count An array of 65536*sizeof(int) bytes that will
  *              contain the counts.
- * @param index An array of 65536*sizeof(size_t) bytes that will
+ * @param index An array of 65536*sizeof(int) bytes that will
  *              contain the indexes. 
  */
-void calculate_indexes(size_t *count, size_t *index) {
-  size_t i;
+void calculate_indexes(int *count, int *index) {
+  int i;
 
   index[0] = 0;
   for (i = 1; i < NSYMBOLS; i++) {
@@ -78,13 +78,13 @@ void calculate_indexes(size_t *count, size_t *index) {
 /* ======================================================================== */
 /** 
  * Calculate the last indexes of the destination array. 
- * @param count An array of 65536*sizeof(size_t) bytes that will
+ * @param count An array of 65536*sizeof(int) bytes that will
  *              contain the counts.
- * @param lindex An array of 65536*sizeof(size_t) bytes that will
+ * @param lindex An array of 65536*sizeof(int) bytes that will
  *              contain the indexes. 
  * @param length The number of words in the source array.
  */
-void calculate_last_indexes(size_t *count, size_t *lindex, size_t length) {
+void calculate_last_indexes(int *count, int *lindex, int length) {
   int i;
 
   lindex[NSYMBOLS-1] = length-1;
@@ -109,14 +109,14 @@ void calculate_last_indexes(size_t *count, size_t *lindex, size_t length) {
  * @param use_previous_byte Use the median value of the previous byte
  *                          to achieve a better sorting.
  */
-void separate_words(unsigned short *src, unsigned short *dst, size_t length,
+void separate_words(unsigned short *src, unsigned short *dst, int length,
                     bool use_previous_byte) {
   long i;
   unsigned short previous;
   unsigned short current;
-  size_t count[NSYMBOLS];
-  size_t index[NSYMBOLS];
-  size_t lindex[NSYMBOLS];
+  int count[NSYMBOLS];
+  int index[NSYMBOLS];
+  int lindex[NSYMBOLS];
   int prev_byte;
 
   if (use_previous_byte) {
@@ -191,13 +191,13 @@ void separate_words(unsigned short *src, unsigned short *dst, size_t length,
  *                          to achieve a better sorting.
  */
 void join_words(unsigned short *src, unsigned short *dst, unsigned short last,
-                size_t length, bool use_previous_byte) {
+                int length, bool use_previous_byte) {
   long i;
   unsigned short previous;
   unsigned short current;
-  size_t count[NSYMBOLS];
-  size_t index[NSYMBOLS];
-  size_t lindex[NSYMBOLS];
+  int count[NSYMBOLS];
+  int index[NSYMBOLS];
+  int lindex[NSYMBOLS];
   int prev_byte; 
 
   if (use_previous_byte) {
