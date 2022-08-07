@@ -54,6 +54,54 @@ void count_words(unsigned short *src, size_t len, size_t *count) {
 
 /* ======================================================================== */
 /** 
+ * Calculate the indexes of the destination array. 
+ * @param count An array of 65536*sizeof(size_t) bytes that will
+ *              contain the counts.
+ * @param index An array of 65536*sizeof(size_t) bytes that will
+ *              contain the indexes. 
+ */
+void calculate_indexes(size_t *count, size_t *index) {
+  size_t i;
+
+  index[0] = 0;
+  for (i = 1; i < NSYMBOLS; i++) {
+    index[i] = index[i-1] + count[i-1];
+  }
+	
+#ifdef DEBUG_INDEX
+  for (i = 0; i < NSYMBOLS; i++) {
+    fprintf(stdout, "Index[%i] = %li\n", i, index[i]);
+  }
+#endif	
+}
+
+/* ======================================================================== */
+/** 
+ * Calculate the last indexes of the destination array. 
+ * @param count An array of 65536*sizeof(size_t) bytes that will
+ *              contain the counts.
+ * @param lindex An array of 65536*sizeof(size_t) bytes that will
+ *              contain the indexes. 
+ * @param length The number of words in the source array.
+ */
+void calculate_last_indexes(size_t *count, size_t *lindex, size_t length) {
+  int i;
+
+  lindex[NSYMBOLS-1] = length-1;
+  for (i=NSYMBOLS-2; i>=0; i--) {
+    lindex[i] = lindex[i+1] - count[i+1];
+  }
+
+#ifdef DEBUG_INDEX
+  for (i = 0; i < NSYMBOLS; i++) {
+    fprintf(stdout, "Last Index[%i] = %li\n", i, lindex[i]);
+  }
+#endif  
+}
+
+
+/* ======================================================================== */
+/** 
  * Separate words. 
  * @param src The source array of words (to be separated into groups).
  * @param dst The destination array of words.
@@ -83,28 +131,10 @@ void separate_words(unsigned short *src, unsigned short *dst, size_t length,
   
   
   // Calculate the indexes
-  index[0] = 0;
-  for (i = 1; i < NSYMBOLS; i++) {
-    index[i] = index[i-1] + count[i-1];
-  }
-  
-#ifdef DEBUG_INDEX
-  for (i = 0; i < NSYMBOLS; i++) {
-    fprintf(stdout, "Index[%i] = %li\n", i, index[i]);
-  }
-#endif
+  calculate_indexes(count, index);
   
   if (use_previous_byte) {
-    lindex[NSYMBOLS-1] = length-1;
-    for (i=NSYMBOLS-2; i>=0; i--) {
-      lindex[i] = lindex[i+1] - count[i+1];
-    }
-
-#ifdef DEBUG_INDEX
-    for (i = 0; i < NSYMBOLS; i++) {
-      fprintf(stdout, "Last Index[%i] = %li\n", i, lindex[i]);
-    }
-#endif  
+	calculate_last_indexes(count, lindex, length);
   } 
 
   // Separate the bytes
@@ -181,29 +211,11 @@ void join_words(unsigned short *src, unsigned short *dst, unsigned short last,
   count[0]++;
   
   // Calculate the indexes
-  index[0] = 0;
-  for (i = 1; i < NSYMBOLS; i++) {
-    index[i] = index[i-1] + count[i-1];
-  }
-
-#ifdef DEBUG_INDEX
-  for (i = 0; i < NSYMBOLS; i++) {
-    fprintf(stdout, "Index[%i] = %li\n", i, index[i]);
-  }
-#endif  
+  calculate_indexes(count, index);
   
   if (use_previous_byte) {
-    lindex[NSYMBOLS-1] = length-1;
-    for (i=NSYMBOLS-2; i>=0; i--) {
-      lindex[i] = lindex[i+1] - count[i+1];
-    }
-
-#ifdef DEBUG_INDEX
-    for (i = 0; i < NSYMBOLS; i++) {
-      fprintf(stdout, "Last Index[%i] = %li\n", i, lindex[i]);
-    }
-#endif  
-  }
+	calculate_last_indexes(count, lindex, length);
+  } 
   
   // join the words    
   previous = 0;
