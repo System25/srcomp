@@ -26,7 +26,7 @@ DEPENDENCIES=\
         dynarray.h\
 	dynarray.o
 
-CFLAGS=
+CFLAGS=-Wall -pg
 LDFLAGS=
 
 srcomp: srcomp.c $(DEPENDENCIES) -liberty

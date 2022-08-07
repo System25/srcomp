@@ -24,6 +24,11 @@
 
 #define DEFAULT_BLOCK_SIZE 1
 #define VERSION 1
+//#define USE_CHECKSUM
+
+#ifdef USE_CHECKSUM
+#include <libiberty/libiberty.h>
+#endif
 
 /**
  * File header.
@@ -41,7 +46,9 @@ typedef struct {
  */
 typedef struct {
     size_t length;
+#ifdef USE_CHECKSUM	
     unsigned int checksum;
+#endif	
     unsigned short last_word;
     unsigned char first_byte;
 } sr_block_header;
@@ -60,6 +67,20 @@ void usage() {
   fprintf(stdout, " -o <file>    specify the output file.\n");    
   fprintf(stdout, " -b <size>    specify the block size (in megabytes).\n");
     
+}
+
+/** 
+ * Compress a data block. 
+ * @param src The source array of words (to be separated into groups).
+ * @param dst The destination array of words.
+ * @param length The number of words in the source array.
+ * @param use_previous_byte Use the median value of the previous byte
+ *                          to achieve a better sorting.
+ */
+void compress_block(unsigned short *src, unsigned short *dst, size_t length,
+                    bool use_previous_byte) {
+
+  separate_words(src, dst, length, use_previous_byte);
 }
 
 /* ======================================================================== */
@@ -124,7 +145,9 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     }
     
     block_header.length = bs;
+#ifdef USE_CHECKSUM	  
     block_header.checksum = xcrc32((unsigned char *) src, bs, 0x80000000);
+#endif	  
     block_header.last_word = src[l-1];
     block_header.first_byte = ((unsigned char *) src)[0];
       
@@ -133,7 +156,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
       return -1;
     }
   
-    separate_words(src, dst, l, use_previous_byte);
+    compress_block(src, dst, l, use_previous_byte);
     
     if (fwrite(dst, 1, bs, outfile) != bs) {
       perror("Error writing data to output file");
@@ -147,17 +170,19 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     bs = (length % bs);
     if ( (l % 1) == 1 ) {
       bs++;
-	  src[(bs>>1)-1] = 0;
+      src[(bs>>1)-1] = 0;
     }
-	l = (bs >> 1);
-	
+    l = (bs >> 1);
+    
     if (fread(src, 1, bs, infile) != bs) {
       perror("Error reading input data");        
       return -1;
     }
     
     block_header.length = bs;
+#ifdef USE_CHECKSUM	  
     block_header.checksum = xcrc32((unsigned char *) src, bs, 0x80000000);
+#endif	  
     block_header.last_word = src[l-1];
     block_header.first_byte = ((unsigned char *) src)[0];
       
@@ -166,7 +191,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
       return -1;
     }
   
-    separate_words(src, dst, l, use_previous_byte);
+    compress_block(src, dst, l, use_previous_byte);
     
     if (fwrite(dst, 1, bs, outfile) != bs) {
       perror("Error writing data to output file");
@@ -180,6 +205,21 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
   free(dst);
     
   return 0;
+}
+
+/* ======================================================================== */
+/** 
+ * Decompress a data block.
+ * @param src The source array of words (to be joined from groups).
+ * @param dst The destination array of words.
+ * @param last Value of the last word (before separation).
+ * @param length The number of words in the source array.
+ * @param use_previous_byte Use the median value of the previous byte
+ *                          to achieve a better sorting.
+ */
+void decompress_block(unsigned short *src, unsigned short *dst, unsigned short last,
+                size_t length, bool use_previous_byte) {
+  join_words(src, dst,last, length, use_previous_byte);
 }
 
 /* ======================================================================== */
@@ -216,12 +256,12 @@ int decompress_data(FILE *infile, FILE *outfile) {
   if (header.version != VERSION) {
     fprintf(stderr, "Wrong version!\n");
     return -1;
-  }	
-	
+  }    
+    
   length = header.length;
   use_previous_byte = header.use_previous_byte;
-  block_size = header.block_size;	  
-	
+  block_size = header.block_size;      
+    
   // Allocate memory
   bs = block_size * 1024 * 1024;
   src = (unsigned short *) malloc(bs);
@@ -241,33 +281,35 @@ int decompress_data(FILE *infile, FILE *outfile) {
   nblocks = (length / bs);
   l = (bs >> 1);
   for (i = 0; i<nblocks; i++) {
-	// Read the block header
+    // Read the block header
     if (fread(&block_header, sizeof(block_header), 1, infile) != 1) {
       perror("Error reading block header");
       return -1;
-    }	  
+    }      
 
     // Check the magic number
     if (block_header.length != bs) {
       fprintf(stderr, "Bad block size!\n");
       return -1;
-    }	
+    }    
     
-	// Read input data
+    // Read input data
     if (fread(src, 1, bs, infile) != bs) {
       perror("Error reading input data");    
       return -1;
     }
-	
-	join_words(src, dst, block_header.last_word, l, use_previous_byte);
+    
+    decompress_block(src, dst, block_header.last_word, l, use_previous_byte);
   
-	// Check the checksum
+#ifdef USE_CHECKSUM	  
+    // Check the checksum
     if (block_header.checksum != xcrc32(
           (unsigned char *) dst, bs, 0x80000000)) {
       fprintf(stderr, "Bad checksum!\n");
-      return -1;		
-	}
-	  
+      return -1;        
+    }
+#endif	  
+      
     if (fwrite(dst, 1, bs, outfile) != bs) {
       perror("Error writing data to output file");
       return -1;
@@ -280,37 +322,39 @@ int decompress_data(FILE *infile, FILE *outfile) {
     bs = (length % bs);
     if ( (l % 1) == 1 ) {
       bs++;
-	  src[(bs>>1)-1] = 0;
+      src[(bs>>1)-1] = 0;
     }
-	l = (bs >> 1);
-	
+    l = (bs >> 1);
+    
     // Read the block header
     if (fread(&block_header, sizeof(block_header), 1, infile) != 1) {
       perror("Error reading block header");
       return -1;
-    }	  
+    }      
 
     // Check the magic number
     if (block_header.length != bs) {
       fprintf(stderr, "Bad block size!\n");
       return -1;
-    }	
+    }    
     
-	// Read input data
+    // Read input data
     if (fread(src, 1, bs, infile) != bs) {
       perror("Error reading input data");    
       return -1;
     }
-	
-	join_words(src, dst, block_header.last_word, l, use_previous_byte);
+    
+    decompress_block(src, dst, block_header.last_word, l, use_previous_byte);
   
-	// Check the checksum
+#ifdef USE_CHECKSUM	  
+    // Check the checksum
     if (block_header.checksum != xcrc32(
           (unsigned char *) dst, bs, 0x80000000)) {
       fprintf(stderr, "Bad checksum!\n");
-      return -1;		
-	}
-	  
+      return -1;        
+    }
+#endif	  
+      
     if (fwrite(dst, 1, bs, outfile) != bs) {
       perror("Error writing data to output file");
       return -1;
@@ -321,7 +365,7 @@ int decompress_data(FILE *infile, FILE *outfile) {
   // Release memory
   free(src);
   free(dst);
-	
+    
   return 0;
 }
 
