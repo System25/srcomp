@@ -21,6 +21,7 @@
 #include <libiberty/libiberty.h>
 
 #include "wseparator.h"
+#include "split2b.h"
 
 #define DEFAULT_BLOCK_SIZE 1
 #define VERSION 1
@@ -50,7 +51,7 @@ typedef struct {
     unsigned int checksum;
 #endif	
     unsigned short last_word;
-    unsigned char first_byte;
+    unsigned char last_byte;
 } sr_block_header;
 
 /* ======================================================================== */
@@ -74,13 +75,17 @@ void usage() {
  * @param src The source array of words (to be separated into groups).
  * @param dst The destination array of words.
  * @param length The number of words in the source array.
+ * @param last_byte Value of the last byte (before second separation). 
  * @param use_previous_byte Use the median value of the previous byte
  *                          to achieve a better sorting.
  */
 void compress_block(unsigned short *src, unsigned short *dst, size_t length,
-                    bool use_previous_byte) {
+                    unsigned char *last_byte, bool use_previous_byte) {
 
   separate_words(src, dst, length, use_previous_byte);
+  *last_byte = ((unsigned char *) dst)[(length<<1) - 1];
+  separate_bytes(dst, (unsigned char *) src, length);
+  memcpy(dst, src, length*2);
 }
 
 /* ======================================================================== */
@@ -150,14 +155,14 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     block_header.checksum = xcrc32((unsigned char *) src, bs, 0x80000000);
 #endif	  
     block_header.last_word = src[l-1];
-    block_header.first_byte = ((unsigned char *) src)[0];
-      
+        
+    compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
+    
     if (fwrite(&block_header, sizeof(block_header), 1, outfile) != 1) {
       perror("Error writing block header");
       return -1;
     }
-  
-    compress_block(src, dst, l, use_previous_byte);
+    
     
     if (fwrite(dst, 1, bs, outfile) != bs) {
       perror("Error writing data to output file");
@@ -185,14 +190,15 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     block_header.checksum = xcrc32((unsigned char *) src, bs, 0x80000000);
 #endif	  
     block_header.last_word = src[l-1];
-    block_header.first_byte = ((unsigned char *) src)[0];
       
+  
+    compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
+
     if (fwrite(&block_header, sizeof(block_header), 1, outfile) != 1) {
       perror("Error writing block header");
       return -1;
     }
-  
-    compress_block(src, dst, l, use_previous_byte);
+    
     
     if (fwrite(dst, 1, bs, outfile) != bs) {
       perror("Error writing data to output file");
@@ -213,14 +219,18 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
  * Decompress a data block.
  * @param src The source array of words (to be joined from groups).
  * @param dst The destination array of words.
- * @param last Value of the last word (before separation).
+ * @param last_word Value of the last word (before separation).
+ * @param last_byte Value of the last byte (before second separation).
  * @param length The number of words in the source array.
  * @param use_previous_byte Use the median value of the previous byte
  *                          to achieve a better sorting.
  */
-void decompress_block(unsigned short *src, unsigned short *dst, unsigned short last,
-                size_t length, bool use_previous_byte) {
-  join_words(src, dst,last, length, use_previous_byte);
+void decompress_block(unsigned short *src, unsigned short *dst,
+                      unsigned short last_word, unsigned char last_byte,
+                      size_t length, bool use_previous_byte) {
+  join_bytes((unsigned char *) src, dst, last_byte, length);
+  join_words(dst, src, last_word, length, use_previous_byte);
+  memcpy(dst, src, length*2);
 }
 
 /* ======================================================================== */
@@ -301,7 +311,8 @@ int decompress_data(FILE *infile, FILE *outfile) {
       return -1;
     }
     
-    decompress_block(src, dst, block_header.last_word, l, use_previous_byte);
+    decompress_block(src, dst, block_header.last_word,
+                     block_header.last_byte, l, use_previous_byte);
   
 #ifdef USE_CHECKSUM	  
     // Check the checksum
@@ -346,7 +357,8 @@ int decompress_data(FILE *infile, FILE *outfile) {
       return -1;
     }
     
-    decompress_block(src, dst, block_header.last_word, l, use_previous_byte);
+    decompress_block(src, dst, block_header.last_word,
+                     block_header.last_byte, l, use_previous_byte);
   
 #ifdef USE_CHECKSUM	  
     // Check the checksum

@@ -31,7 +31,7 @@ unsigned char median[NSYMBOLS];
 /** 
  * Count words in an array. 
  * @param src The source data whose words will be counted.
- * @param len The number of workds in the source data.
+ * @param len The number of words in the source data.
  * @param count An array of 65536*sizeof(int) bytes that will
  *              contain the counts.
  */
@@ -137,7 +137,7 @@ void separate_words(unsigned short *src, unsigned short *dst, int length,
 	calculate_last_indexes(count, lindex, length);
   } 
 
-  // Separate the bytes
+  // Separate the words
   previous = 0;
   prev_byte = 0; 
   for (i = 0; i < length; i++) {
