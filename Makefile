@@ -22,9 +22,12 @@ DEPENDENCIES=\
 	wseparator.o\
 	wseparator.h\
 	split2b.o\
-	split2b.h
+	split2b.h\
+	mtf.o\
+	mtf.h
 
-CFLAGS=-Wall -pg
+#CFLAGS=-Wall -pg
+CFLAGS=-O3
 LDFLAGS=
 
 srcomp: srcomp.c $(DEPENDENCIES) -liberty

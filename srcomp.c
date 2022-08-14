@@ -22,6 +22,7 @@
 
 #include "wseparator.h"
 #include "split2b.h"
+#include "mtf.h"
 
 #define DEFAULT_BLOCK_SIZE 1
 #define VERSION 1
@@ -81,11 +82,15 @@ void usage() {
  */
 void compress_block(unsigned short *src, unsigned short *dst, size_t length,
                     unsigned char *last_byte, bool use_previous_byte) {
-
+  mtf_status status;
+  
+  mtf_reset(&status);
+  
   separate_words(src, dst, length, use_previous_byte);
   *last_byte = ((unsigned char *) dst)[(length<<1) - 1];
   separate_bytes(dst, (unsigned char *) src, length);
-  memcpy(dst, src, length*2);
+  mtf_code((unsigned char *) src, (unsigned char *) dst, (length << 1),
+           &status);
 }
 
 /* ======================================================================== */
@@ -228,9 +233,14 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
 void decompress_block(unsigned short *src, unsigned short *dst,
                       unsigned short last_word, unsigned char last_byte,
                       size_t length, bool use_previous_byte) {
-  join_bytes((unsigned char *) src, dst, last_byte, length);
-  join_words(dst, src, last_word, length, use_previous_byte);
-  memcpy(dst, src, length*2);
+  mtf_status status;
+  
+  mtf_reset(&status);
+  
+  mtf_decode((unsigned char *) src, (unsigned char *) dst, (length<<1),
+             &status);
+  join_bytes((unsigned char *) dst, src, last_byte, length);
+  join_words(src, dst, last_word, length, use_previous_byte);
 }
 
 /* ======================================================================== */
