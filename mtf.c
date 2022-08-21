@@ -38,16 +38,21 @@ void mtf_reset(mtf_status *status) {
  * @param mtf_status The MTF coding status. 
  */
 void _mtf_move_to_front_pos(int position, mtf_status *status) {
-  int c;
+  int c, i;
+  unsigned char *symbols;
   
   if (position == BYTE_SYMBOLS_1) {
     return;
   }
   
-  c = status->symbols[position];
-  memcpy(status->symbols+position, status->symbols+position+1,
-         BYTE_SYMBOLS_1 - position);
-  status->symbols[BYTE_SYMBOLS_1] = c;
+  symbols = status->symbols;
+  c = symbols[position];
+  
+  for (i = position; i<BYTE_SYMBOLS_1; i++) {
+    symbols[i] = symbols[i+1];
+  }
+  
+  symbols[BYTE_SYMBOLS_1] = c;
 }
 
 /* ======================================================================== */
@@ -59,17 +64,19 @@ void _mtf_move_to_front_pos(int position, mtf_status *status) {
 #ifdef __OPTIMIZE__
 void _mtf_move_to_front(int c, mtf_status *status) {
   int d, i;
+  unsigned char *distances;
   
-  d = status->distances[c];
+  distances = status->distances;
+  d = distances[c];
   if (d==0) {
     return;
   }
   
   for (i = 0; i<BYTE_SYMBOLS; i++) {
-    status->distances[i] += ((status->distances[i] < d) ? 1 : 0);
+    distances[i] += ((distances[i] < d) ? 1 : 0);
   }
   
-  status->distances[c] = 0;
+  distances[c] = 0;
 }
 #endif
 

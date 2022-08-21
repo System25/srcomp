@@ -1,5 +1,5 @@
 /* A function to split 2-byte data elements (words) into two separated
-   groups of 256 groups by the other byte.
+   groups.
 
    Copyright (C) 2022 Abraham Macias Paredes.
    

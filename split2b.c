@@ -1,5 +1,4 @@
-/* A function to split 2-byte data elements (words) into two separated
-   groups of 256 groups by the other byte.
+/* A function to split 2-byte data elements (words) into two separated.
 
    Copyright (C) 2022 Abraham Macias Paredes.
    
@@ -39,8 +38,7 @@ void count_bytes(unsigned char *src, int len, int *count) {
 
   memset(count, 0, NSYMBOLS*sizeof(int));
 
-
-  for (i = 0; i < len; i++) {
+  for (i = 0; i < len; i++) {  
     count[ src[i] ]++;
   }
   
@@ -57,36 +55,25 @@ void count_bytes(unsigned char *src, int len, int *count) {
  * Count bytes in an array. 
  * @param src The source data whose bytes will be counted.
  * @param len The number of words in the source data.
- * @param count_h An array of 256*sizeof(int) bytes that will
+ * @param count An array of 256*sizeof(int) bytes that will
  *              contain the counts of the higher byte.
- * @param count_l An array of 256*sizeof(int) bytes that will
- *              contain the counts of the lower byte. 
  */
-void count_word_bytes(unsigned short *src, int len, int *count_h,
-                      int *count_l) {
+void count_word_bytes(unsigned short *src, int len, int *count) {
   int i;
-  unsigned char *src_h, *src_l;
+  unsigned char *src_h;
 
-  memset(count_h, 0, NSYMBOLS*sizeof(int));
-  memset(count_l, 0, NSYMBOLS*sizeof(int));
+  memset(count, 0, NSYMBOLS*sizeof(int));
   src_h = (unsigned char *) src;
-  src_l = ((unsigned char *) src) + 1;
 
   for (i = 0; i < len; i++) {
-    count_h[ *src_h ]++;
-    count_l[ *src_l ]++;
+    count[ *src_h ]++;
     src_h += 2;
-    src_l += 2;
   }
     
 #ifdef DEBUG_COUNTS
   for (i = 0; i < NSYMBOLS; i++) {
-    fprintf(stdout, "Count[%i]=%i\n", i, count_h[i]);
+    fprintf(stdout, "Count[%i]=%i\n", i, count[i]);
   }
-  
-  for (i = 0; i < NSYMBOLS; i++) {
-    fprintf(stdout, "Count[%i]=%i\n", i, count_l[i]);
-  }  
 #endif  
   
 }
@@ -124,11 +111,8 @@ void calculate_byte_indexes(int *count, int *index) {
 void separate_bytes(unsigned short *src, unsigned char *dst, int length) {
   long i;
   unsigned char current_h, current_l;
-  unsigned char previous_l;
   int count_h[NSYMBOLS];
-  int count_l[NSYMBOLS];
   int index_h[NSYMBOLS];
-  int index_l[NSYMBOLS];
   unsigned char *dst_h;
   unsigned char *dst_l;
   unsigned char *src_h;
@@ -140,18 +124,12 @@ void separate_bytes(unsigned short *src, unsigned char *dst, int length) {
   src_l = ((unsigned char *) src) + 1;  
   
   // Count the bytes
-  count_word_bytes(src, length, count_h, count_l);
-  // (There is no word after last!)
-  count_l[src_h[(length<<1) - 1]]--;
-  count_l[0]++;  
-  
+  count_word_bytes(src, length, count_h);
   
   // Calculate the indexes
   calculate_byte_indexes(count_h, index_h);
-  calculate_byte_indexes(count_l, index_l);
   
-  // Separate the bytes
-  previous_l = 0; 
+  // Separate the bytes 
   for (i = 0; i < length; i++) {
     current_h = *src_h;
     current_l = *src_l;
@@ -159,13 +137,11 @@ void separate_bytes(unsigned short *src, unsigned char *dst, int length) {
     src_l += 2;
  
 #ifdef DEBUG
-  fprintf(stdout, "dst_h[%06x] = %i\n", index_l[previous_l], current_h);
+  fprintf(stdout, "dst_h[%06x] = %i\n", i, current_h);
   fprintf(stdout, "dst_l[%06x] = %i\n", index_h[current_h], current_l);
 #endif	    
-    dst_h[index_l[previous_l]++] = current_h;
+    dst_h[i] = current_h;
     dst_l[index_h[current_h]++] = current_l;
-   
-    previous_l = current_l;
   }
 
 }
@@ -182,26 +158,18 @@ void join_bytes(unsigned char *src, unsigned short *dst, unsigned char last,
                 int length) {
   long i;
   unsigned char current_h, current_l;
-  unsigned char previous_l;
   int count_h[NSYMBOLS];
-  int count_l[NSYMBOLS];
   int index_h[NSYMBOLS];
-  int index_l[NSYMBOLS];
   unsigned char *dst_h;
   unsigned char *dst_l;
   unsigned char *src_h;
   unsigned char *src_l;  
   
   // Count the bytes
-  count_bytes(src, length, count_h);
-  count_bytes(src + length, length, count_l);
-  // (There is no byte after last!)
-  count_l[last]--;
-  count_l[0]++;   
+  count_bytes(src, length, count_h);  
   
   // Calculate the indexes
   calculate_byte_indexes(count_h, index_h);
-  calculate_byte_indexes(count_l, index_l);  
 
   // join the bytes
   dst_h = (unsigned char *) dst;
@@ -209,14 +177,13 @@ void join_bytes(unsigned char *src, unsigned short *dst, unsigned char last,
   src_h = src;
   src_l = src + length;
   
-  previous_l = 0;
 
   for (i = 0; i < length; i++) {
-    current_h = src_h[index_l[previous_l]++];
+    current_h = src_h[i];
     current_l = src_l[index_h[current_h]++];
     
 #ifdef DEBUG
-  fprintf(stdout, "dst_h[%06x] = %i\n", index_l[previous_l]-1, current_h);
+  fprintf(stdout, "dst_h[%06x] = %i\n", i, current_h);
   fprintf(stdout, "dst_l[%06x] = %i\n", index_h[current_h]-1, current_l);
 #endif
 
@@ -224,8 +191,6 @@ void join_bytes(unsigned char *src, unsigned short *dst, unsigned char last,
     *dst_l = current_l;
     dst_h += 2;
     dst_l += 2;
-
-    previous_l = current_l;
   }
 
 }

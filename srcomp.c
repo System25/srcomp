@@ -134,6 +134,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
   rewind(infile);
 
   // Write the file header
+  memset(&header, 0, sizeof(header));
   header.magic_number[0] = 'S';
   header.magic_number[1] = 'R';
   header.version = VERSION;
@@ -155,6 +156,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
       return -1;
     }
     
+    memset(&block_header, 0, sizeof(block_header));
     block_header.length = bs;
 #ifdef USE_CHECKSUM	  
     block_header.checksum = xcrc32((unsigned char *) src, bs, 0x80000000);
