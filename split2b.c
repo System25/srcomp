@@ -1,4 +1,5 @@
-/* A function to split 2-byte data elements (words) into two separated.
+/* A function to split 2-byte data elements (words) into two separated
+   bytes.
 
    Copyright (C) 2022 Abraham Macias Paredes.
    
@@ -21,6 +22,9 @@
 //#define DEBUG
 //#define DEBUG_COUNTS
 //#define DEBUG_INDEX
+
+/* 2-byte elements byte to sort by (could be 0 or 1) */
+#define SORTING_BYTE 0
 
 /* number of symbols */
 #define NSYMBOLS 256
@@ -60,14 +64,14 @@ void count_bytes(unsigned char *src, int len, int *count) {
  */
 void count_word_bytes(unsigned short *src, int len, int *count) {
   int i;
-  unsigned char *src_h;
+  unsigned char *src_s;
 
   memset(count, 0, NSYMBOLS*sizeof(int));
-  src_h = (unsigned char *) src;
+  src_s = ((unsigned char *) src) + SORTING_BYTE;
 
   for (i = 0; i < len; i++) {
-    count[ *src_h ]++;
-    src_h += 2;
+    count[ *src_s ]++;
+    src_s += 2;
   }
     
 #ifdef DEBUG_COUNTS
@@ -111,8 +115,8 @@ void calculate_byte_indexes(int *count, int *index) {
 void separate_bytes(unsigned short *src, unsigned char *dst, int length) {
   long i;
   unsigned char current_h, current_l;
-  int count_h[NSYMBOLS];
-  int index_h[NSYMBOLS];
+  int count_s[NSYMBOLS];
+  int index_s[NSYMBOLS];
   unsigned char *dst_h;
   unsigned char *dst_l;
   unsigned char *src_h;
@@ -124,10 +128,10 @@ void separate_bytes(unsigned short *src, unsigned char *dst, int length) {
   src_l = ((unsigned char *) src) + 1;  
   
   // Count the bytes
-  count_word_bytes(src, length, count_h);
+  count_word_bytes(src, length, count_s);
   
   // Calculate the indexes
-  calculate_byte_indexes(count_h, index_h);
+  calculate_byte_indexes(count_s, index_s);
   
   // Separate the bytes 
   for (i = 0; i < length; i++) {
@@ -135,13 +139,26 @@ void separate_bytes(unsigned short *src, unsigned char *dst, int length) {
     current_l = *src_l;
     src_h += 2;
     src_l += 2;
- 
+
+#if SORTING_BYTE == 0
+    /* Sort by highest byte */
 #ifdef DEBUG
-  fprintf(stdout, "dst_h[%06x] = %i\n", i, current_h);
-  fprintf(stdout, "dst_l[%06x] = %i\n", index_h[current_h], current_l);
+    fprintf(stdout, "dst_h[%06x] = %i\n", i, current_h);
+    fprintf(stdout, "dst_l[%06x] = %i\n", index_s[current_h], current_l);
 #endif	    
     dst_h[i] = current_h;
-    dst_l[index_h[current_h]++] = current_l;
+    dst_l[index_s[current_h]++] = current_l;
+    
+#else
+    /* Sort by lowest byte */    
+#ifdef DEBUG
+    fprintf(stdout, "dst_h[%06x] = %i\n", index_s[current_l], current_h);
+    fprintf(stdout, "dst_l[%06x] = %i\n", i, current_l);
+#endif	    
+    dst_h[index_s[current_l]++] = current_h;
+    dst_l[i] = current_l;    
+    
+#endif    
   }
 
 }
@@ -158,18 +175,18 @@ void join_bytes(unsigned char *src, unsigned short *dst, unsigned char last,
                 int length) {
   long i;
   unsigned char current_h, current_l;
-  int count_h[NSYMBOLS];
-  int index_h[NSYMBOLS];
+  int count_s[NSYMBOLS];
+  int index_s[NSYMBOLS];
   unsigned char *dst_h;
   unsigned char *dst_l;
   unsigned char *src_h;
   unsigned char *src_l;  
   
   // Count the bytes
-  count_bytes(src, length, count_h);  
+  count_bytes(src + length*SORTING_BYTE, length, count_s);  
   
   // Calculate the indexes
-  calculate_byte_indexes(count_h, index_h);
+  calculate_byte_indexes(count_s, index_s);
 
   // join the bytes
   dst_h = (unsigned char *) dst;
@@ -179,12 +196,26 @@ void join_bytes(unsigned char *src, unsigned short *dst, unsigned char last,
   
 
   for (i = 0; i < length; i++) {
+#if SORTING_BYTE == 0
+    /* Sort by highest byte */
     current_h = src_h[i];
-    current_l = src_l[index_h[current_h]++];
+    current_l = src_l[index_s[current_h]++];
     
 #ifdef DEBUG
-  fprintf(stdout, "dst_h[%06x] = %i\n", i, current_h);
-  fprintf(stdout, "dst_l[%06x] = %i\n", index_h[current_h]-1, current_l);
+    fprintf(stdout, "dst_h[%06x] = %i\n", i, current_h);
+    fprintf(stdout, "dst_l[%06x] = %i\n", index_s[current_h]-1, current_l);
+#endif
+
+#else
+    /* Sort by lowest byte */
+    current_l = src_l[i];
+    current_h = src_h[index_s[current_l]++];
+    
+#ifdef DEBUG
+    fprintf(stdout, "dst_h[%06x] = %i\n", index_s[current_l]-1, current_h);
+    fprintf(stdout, "dst_l[%06x] = %i\n", i, current_l);
+#endif
+    
 #endif
 
     *dst_h = current_h;
