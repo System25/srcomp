@@ -45,9 +45,13 @@ tests: $(SOURCES) $(TESTS) tests.c -lcmocka
 test: tests
 	./tests
 
+docs:
+	doxygen doxygen.conf
+
 clean:
 	rm -f *.o
 	rm -f tests
 	rm -f srcomp
+	rm -rf doc
 
 
