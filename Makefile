@@ -18,22 +18,36 @@
 
 ALL: srcomp
 
-DEPENDENCIES=\
+SOURCES=\
 	wseparator.o\
 	wseparator.h\
 	split2b.o\
 	split2b.h\
+	bitm.o\
+	bitm.h\
 	mtf.o\
 	mtf.h
+
+TESTS=\
+	test_bitm.o\
+	test_bitm.h
+	
+
 
 #CFLAGS=-Wall -pg
 CFLAGS=-O3
 LDFLAGS=
 
-srcomp: srcomp.c $(DEPENDENCIES) -liberty
+srcomp: srcomp.c $(SOURCES) -liberty
+
+tests: $(SOURCES) $(TESTS) tests.c -lcmocka
+
+test: tests
+	./tests
 
 clean:
 	rm -f *.o
+	rm -f tests
 	rm -f srcomp
 
 
