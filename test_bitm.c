@@ -206,3 +206,108 @@ void write_nbit_between_elements_test() {
   bitm_free(bma);
 }
 
+/* ======================================================================== */
+/**
+ * Test the reading of unary data.
+ */
+void read_unary_test() {
+  ELEMENT *data;
+  bitm_array *bma;
+  int length;
+  
+  // given
+  length = 16;
+  data = (ELEMENT *) malloc(sizeof(ELEMENT) * length);
+  data[0] = 0x01810000;
+  data[1] = 0x80000000;
+  data[2] = 0x00000000;
+  data[3] = 0x00000001;
+  bma =  bitm_wrap(data, length);
+  
+  // when - then
+  assert_int_equal(7, bitm_read_unary(bma));
+  assert_int_equal(0, bitm_read_unary(bma)); 
+  assert_int_equal(6, bitm_read_unary(bma)); 
+  assert_int_equal(16, bitm_read_unary(bma)); 
+  assert_int_equal(94, bitm_read_unary(bma)); 
+  
+  // cleanup
+  bitm_free(bma);
+}
+
+/* ======================================================================== */
+/**
+ * Test the writting of unary data.
+ */
+void write_unary_test() {
+  bitm_array *bma;
+  
+  // given
+  bma = bitm_alloc(16);
+  
+  // when
+  bitm_write_unary(bma, 7);
+  bitm_write_unary(bma, 0);
+  bitm_write_unary(bma, 6);
+  bitm_write_unary(bma, 16);
+  bitm_write_unary(bma, 94);
+  bitm_flush(bma);
+  
+  // then
+  assert_int_equal(4, bitm_get_index(bma));
+  assert_int_equal(0x01810000, bitm_get_data(bma)[0]);
+  assert_int_equal(0x80000000, bitm_get_data(bma)[1]);
+  assert_int_equal(0x00000000, bitm_get_data(bma)[2]);
+  assert_int_equal(0x00000001, bitm_get_data(bma)[3]); 
+  
+  // cleanup
+  bitm_free(bma);
+}
+
+/* ======================================================================== */
+/**
+ * Test the reading of Elias-Gamma coded data.
+ */
+void read_eg_test() {
+  ELEMENT *data;
+  bitm_array *bma;
+  int length;
+  
+  // given
+  length = 16;
+  data = (ELEMENT *) malloc(sizeof(ELEMENT) * length);
+  data[0] = 0xB1E00000;
+  bma =  bitm_wrap(data, length);
+  
+  // when - then
+  assert_int_equal(1, bitm_read_eg(bma));
+  assert_int_equal(3, bitm_read_eg(bma)); 
+  assert_int_equal(15, bitm_read_eg(bma));
+  
+  // cleanup
+  bitm_free(bma);
+}
+
+/* ======================================================================== */
+/**
+ * Test the writting of Elias-Gamma coded data.
+ */
+void write_eg_test() {
+  bitm_array *bma;
+  
+  // given
+  bma = bitm_alloc(16);
+  
+  // when
+  bitm_write_eg(bma, 1);
+  bitm_write_eg(bma, 3);
+  bitm_write_eg(bma, 15);
+  bitm_flush(bma);
+  
+  // then
+  assert_int_equal(1, bitm_get_index(bma));
+  assert_int_equal(0xB1E00000, *bitm_get_data(bma));
+  
+  // cleanup
+  bitm_free(bma);
+}

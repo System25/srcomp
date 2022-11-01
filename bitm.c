@@ -244,12 +244,111 @@ void bitm_write_nbits(bitm_array *arr, int n, int b) {
 
 }
 
-/* ======================================================================== */
 /** 
  * Reads the next unary coding encoded number from the data array.
  * @see https://en.wikipedia.org/wiki/Unary_coding 
  * @param arr The bitm_array to use. 
- * @return A possitive number. 
+ * @return A possitive number (or -1 in case of error). 
  */
-int bitm_read_unary(bitm_array *arr);
+int bitm_read_unary(bitm_array *arr) {
+  int n, d;
+  
+  n = 0;
+  d = bitm_read_bit(arr);
+  if (d<0) return -1;
+  
+  while (d != 1) {
+    n++;
+    d = bitm_read_bit(arr);
+    if (d<0) return -1;
+  }
+
+  return n;
+}
+
+/** 
+ * Writes a possitive number into the data array using unary coding.
+ * @see https://en.wikipedia.org/wiki/Unary_coding
+ * @param arr The bitm_array to use. 
+ * @param n The possitive number to write.    
+ */
+void bitm_write_unary(bitm_array *arr, int n) {
+  int l;
+  
+  l = (BITS_PER_ELEMENT - arr->bit);
+  if (n >= l && l > 0) {
+    bitm_write_nbits(arr, l, 0);
+    n -= l;
+    arr->data[arr->index++] = arr->current;
+    arr->bit = 0;
+  }
+  
+  while (n >= BITS_PER_ELEMENT) {
+    arr->data[arr->index++] = 0;
+    n -= BITS_PER_ELEMENT;
+  }
+  
+  if (n > 0) {
+    bitm_write_nbits(arr, n, 0);
+  }
+  bitm_write_bit(arr, 1);
+}
+
+/** 
+ * Reads the next elias-gamma encoded number from the data array.
+ * @see https://en.wikipedia.org/wiki/Elias_gamma_coding 
+ * @param arr The bitm_array to use. 
+ * @return A possitive number (or -1 in case of error). 
+ */
+int bitm_read_eg(bitm_array *arr) {
+  int e, r;  
+
+  /* Read the exponent in unary code */
+  e = bitm_read_unary(arr);
+  if (e < 0) return -1;
+  r = 0;
+  if (e>0) {
+    /* Read the rest of the binary digits */
+    r = bitm_read_nbits(arr, e);
+    if (r < 0) return -1;
+  }
+  
+  return (1<<e) | r;
+}
+
+/** 
+ * Writes a possitive number into the data array using elias gamma coding.
+ * @see https://en.wikipedia.org/wiki/Elias_gamma_coding
+ * @param arr The bitm_array to use. 
+ * @param n The possitive number to write.    
+ */
+void bitm_write_eg(bitm_array *arr, int n) {
+  int e, r, i, m;
+  if (n <=0) {
+    return;
+  }
+  
+ /* Calulate exponent and the remaining binary digits */
+ e = 0;
+ i = n;
+ m = 0;
+ while (i > 0) {
+   e++;
+   i = (i>>1);
+   m = ((m<<1) | 1);
+ }
+ e--;
+ m = (m>>1);
+ 
+ r = (n & m);
+  
+ /* Write que exponent in unary code */
+ bitm_write_unary(arr, e);
+ 
+ if (e>0) {
+   /* Write the remaining binary digits */
+   bitm_write_nbits(arr, e, r);
+ }
+}
+
 

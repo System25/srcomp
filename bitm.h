@@ -116,7 +116,7 @@ void bitm_write_nbits(bitm_array *arr, int n, int b);
  * Reads the next unary coding encoded number from the data array.
  * @see https://en.wikipedia.org/wiki/Unary_coding 
  * @param arr The bitm_array to use. 
- * @return A possitive number. 
+ * @return A possitive number (or -1 in case of error). 
  */
 int bitm_read_unary(bitm_array *arr);
 
@@ -132,7 +132,7 @@ void bitm_write_unary(bitm_array *arr, int n);
  * Reads the next elias-gamma encoded number from the data array.
  * @see https://en.wikipedia.org/wiki/Elias_gamma_coding 
  * @param arr The bitm_array to use. 
- * @return A possitive number. 
+ * @return A possitive number (or -1 in case of error). 
  */
 int bitm_read_eg(bitm_array *arr);
 

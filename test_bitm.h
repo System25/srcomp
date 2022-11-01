@@ -54,4 +54,27 @@ void write_nbit_test();
  */
 void write_nbit_between_elements_test();
 
+/**
+ * Test the reading of unary data.
+ */
+void read_unary_test();
+
+/**
+ * Test the writting of unary data.
+ */
+void write_unary_test();
+
+/**
+ * Test the reading of Elias-Gamma coded data.
+ */
+void read_eg_test();
+
+/**
+ * Test the writting of Elias-Gamma coded data.
+ */
+void write_eg_test();
+
+
+
+
 #endif
