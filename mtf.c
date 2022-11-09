@@ -63,12 +63,13 @@ void _mtf_move_to_front_pos(int position, mtf_status *status) {
  */
 #ifdef __OPTIMIZE__
 void _mtf_move_to_front(int c, mtf_status *status) {
-  int d, i;
+  int i;
   unsigned char *distances;
+  unsigned char d;
   
   distances = status->distances;
   d = distances[c];
-  if (d==0) {
+  if (d == 0) {
     return;
   }
   
