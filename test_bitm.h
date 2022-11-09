@@ -74,7 +74,19 @@ void read_eg_test();
  */
 void write_eg_test();
 
+/**
+ * Test the reset method functionality.
+ */
+void reset_test();
 
+/**
+ * Test to write and read all the numbers from 1 to 256 in unary coding.
+ */
+void unsigned_char_unary_test();
 
+/**
+ * Test to write and read all the numbers from 1 to 256 in Elias-Gamma coding.
+ */
+void unsigned_char_eg_test();
 
 #endif

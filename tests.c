@@ -39,8 +39,10 @@ int main(void) {
     cmocka_unit_test(write_nbit_between_elements_test),
     cmocka_unit_test(read_unary_test),
     cmocka_unit_test(read_eg_test),
-    cmocka_unit_test(write_eg_test),  
-    
+    cmocka_unit_test(write_eg_test),
+    cmocka_unit_test(reset_test),
+    cmocka_unit_test(unsigned_char_unary_test),
+    cmocka_unit_test(unsigned_char_eg_test),
 	};
 	return cmocka_run_group_tests(tests, NULL, NULL);
 }

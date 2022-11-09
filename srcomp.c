@@ -23,6 +23,7 @@
 #include "wseparator.h"
 #include "split2b.h"
 #include "mtf.h"
+#include "bitm.h"
 
 #define DEFAULT_BLOCK_SIZE 1
 #define VERSION 1
@@ -48,6 +49,7 @@ typedef struct {
  */
 typedef struct {
     size_t length;
+    size_t compressed_length;
 #ifdef USE_CHECKSUM	
     unsigned int checksum;
 #endif	
@@ -90,7 +92,7 @@ void compress_block(unsigned short *src, unsigned short *dst, size_t length,
   *last_byte = ((unsigned char *) dst)[(length<<1) - 1];
   separate_bytes(dst, (unsigned char *) src, length);
   mtf_code((unsigned char *) src, (unsigned char *) dst, (length << 1),
-           &status);
+           &status); 
 }
 
 /* ======================================================================== */
@@ -106,12 +108,13 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
                   bool use_previous_byte) {
   sr_header header;
   sr_block_header block_header;
-  size_t length;
+  size_t length, cl;
   int bs, l;
   int nblocks;
-  int i;
+  int i, j;
   unsigned short *src;
   unsigned short *dst;
+  bitm_array *bitma;
 
   // Allocate memory
   bs = block_size * 1024 * 1024;
@@ -128,6 +131,14 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     return -1;
   }
 
+  bitma = bitm_alloc(bs / sizeof(ELEMENT));
+  if (bitma == NULL) {
+    perror("Error allocating memory\n");
+    free(src);
+    free(dst);
+    return -1;
+  }  
+  
   // Calculate the file length
   fseek(infile, 0L, SEEK_END);
   length = ftell(infile);
@@ -162,8 +173,19 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     block_header.checksum = xcrc32((unsigned char *) src, bs, 0x80000000);
 #endif	  
     block_header.last_word = src[l-1];
+    
         
     compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
+    
+    bitm_reset(bitma);
+    
+    for (j = 0; j<bs; j++) {
+      bitm_write_eg(bitma, ((unsigned char *)dst)[j] + 1);
+    }
+    
+    bitm_flush(bitma);
+    cl = bitm_get_index(bitma);
+    block_header.compressed_length = cl;
     
     if (fwrite(&block_header, sizeof(block_header), 1, outfile) != 1) {
       perror("Error writing block header");
@@ -171,7 +193,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     }
     
     
-    if (fwrite(dst, 1, bs, outfile) != bs) {
+    if (fwrite(bitm_get_data(bitma), sizeof(ELEMENT), cl, outfile) != cl) {
       perror("Error writing data to output file");
       return -1;
     }
@@ -198,16 +220,24 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
 #endif	  
     block_header.last_word = src[l-1];
       
-  
     compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
 
+    bitm_reset(bitma);
+    
+    for (j = 0; j<bs; j++) {
+      bitm_write_eg(bitma, ((unsigned char *)dst)[j] + 1);
+    }
+    
+    bitm_flush(bitma);
+    cl = bitm_get_index(bitma);
+    block_header.compressed_length = cl;
+    
     if (fwrite(&block_header, sizeof(block_header), 1, outfile) != 1) {
       perror("Error writing block header");
       return -1;
     }
     
-    
-    if (fwrite(dst, 1, bs, outfile) != bs) {
+    if (fwrite(bitm_get_data(bitma), sizeof(ELEMENT), cl, outfile) != cl) {
       perror("Error writing data to output file");
       return -1;
     }
@@ -217,6 +247,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
   // Release memory
   free(src);
   free(dst);
+  bitm_free(bitma);
     
   return 0;
 }
@@ -256,13 +287,14 @@ int decompress_data(FILE *infile, FILE *outfile) {
   sr_header header;
   sr_block_header block_header;
   size_t length;
-  int bs, l;
+  int bs, l, cl;
   int nblocks;
-  int i;
+  int i, j;
   unsigned short *src;
   unsigned short *dst;
   int block_size;
   bool use_previous_byte;
+  bitm_array *bitma;
 
   // Read the file header
   if (fread(&header, sizeof(header), 1, infile) != 1) {
@@ -301,6 +333,14 @@ int decompress_data(FILE *infile, FILE *outfile) {
     return -1;
   }
 
+  bitma = bitm_alloc(bs / sizeof(ELEMENT));
+  if (bitma == NULL) {
+    perror("Error allocating memory\n");
+    free(src);
+    free(dst);
+    return -1;
+  }
+  
   // Decode each block
   nblocks = (length / bs);
   l = (bs >> 1);
@@ -317,11 +357,19 @@ int decompress_data(FILE *infile, FILE *outfile) {
       return -1;
     }    
     
+    cl = block_header.compressed_length;
+    bitm_reset(bitma);
+    
     // Read input data
-    if (fread(src, 1, bs, infile) != bs) {
+    if (fread(bitm_get_data(bitma), sizeof(ELEMENT), cl, infile) != cl) {
       perror("Error reading input data");    
       return -1;
     }
+    
+    for (j = 0; j<bs; j++) {
+      ((unsigned char *)src)[j] = (unsigned char) (bitm_read_eg(bitma) - 1);
+    }
+    
     
     decompress_block(src, dst, block_header.last_word,
                      block_header.last_byte, l, use_previous_byte);
@@ -363,10 +411,17 @@ int decompress_data(FILE *infile, FILE *outfile) {
       return -1;
     }    
     
+    cl = block_header.compressed_length;
+    bitm_reset(bitma);
+    
     // Read input data
-    if (fread(src, 1, bs, infile) != bs) {
+    if (fread(bitm_get_data(bitma), sizeof(ELEMENT), cl, infile) != cl) {
       perror("Error reading input data");    
       return -1;
+    }
+    
+    for (j = 0; j<bs; j++) {
+      ((unsigned char *)src)[j] = (unsigned char) (bitm_read_eg(bitma) - 1);
     }
     
     decompress_block(src, dst, block_header.last_word,
@@ -391,6 +446,7 @@ int decompress_data(FILE *infile, FILE *outfile) {
   // Release memory
   free(src);
   free(dst);
+  bitm_free(bitma);
     
   return 0;
 }

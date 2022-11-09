@@ -50,6 +50,12 @@ bitm_array *bitm_alloc(size_t length);
 bitm_array *bitm_wrap(ELEMENT *data, size_t length);
 
 /** 
+ * Resets the internal status of the data array.
+ * @param arr The bitm_array to use.
+ */
+void bitm_reset(bitm_array *arr);
+
+/** 
  * Releases the memory of a bitm_array. 
  * @param arr The bitm_array to release.
  */

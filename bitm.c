@@ -70,6 +70,21 @@ bitm_array *bitm_wrap(ELEMENT *data, size_t length) {
 
 /* ======================================================================== */
 /** 
+ * Resets the internal status of the data array.
+ * @param arr The bitm_array to use.
+ */
+void bitm_reset(bitm_array *arr) {
+  if (arr == NULL) {
+    return;
+  }
+  
+  arr->index = 0;
+  arr->current = 0;
+  arr->bit = 0;
+}
+
+/* ======================================================================== */
+/** 
  * Releases the memory of a bitm_array. 
  * @param arr The bitm_array to release.
  */
@@ -175,6 +190,7 @@ void bitm_write_bit(bitm_array *arr, int b) {
   if (arr->bit == BITS_PER_ELEMENT) {
     arr->data[arr->index++] = arr->current;
     arr->bit = 0;
+    arr->current = 0;
   }  
   
   arr->current = ((arr->current<<1) | (b & 1));
@@ -202,7 +218,7 @@ int bitm_read_nbits(bitm_array *arr, int n) {
   if (n > arr->bit) {
     b = (arr->current & mask[arr->bit]);
     n -= arr->bit;
-    
+
     arr->current = arr->data[arr->index++];
     arr->bit = BITS_PER_ELEMENT;
   }
@@ -228,20 +244,21 @@ void bitm_write_nbits(bitm_array *arr, int n, int b) {
   if (arr->bit == BITS_PER_ELEMENT) {
     arr->data[arr->index++] = arr->current;
     arr->bit = 0;
+    arr->current = 0;
   }  
   
   l = (BITS_PER_ELEMENT - arr->bit);
   if (n > l) {
-    arr->current = ((arr->current<<l) | (b>>l));
     n -= l;
-    
+    arr->current = ((arr->current<<l) | (b>>n));
+      
     arr->data[arr->index++] = arr->current;
     arr->bit = 0;
+    arr->current = 0;
   }
-  
+
   arr->current = ((arr->current<<n) | (b & mask[n]));
   arr->bit += n;
-
 }
 
 /** 
@@ -279,9 +296,13 @@ void bitm_write_unary(bitm_array *arr, int n) {
   if (n >= l && l > 0) {
     bitm_write_nbits(arr, l, 0);
     n -= l;
+  }
+  
+  if (arr->bit == BITS_PER_ELEMENT) {
     arr->data[arr->index++] = arr->current;
     arr->bit = 0;
-  }
+    arr->current = 0;
+  }   
   
   while (n >= BITS_PER_ELEMENT) {
     arr->data[arr->index++] = 0;
@@ -303,7 +324,7 @@ void bitm_write_unary(bitm_array *arr, int n) {
 int bitm_read_eg(bitm_array *arr) {
   int e, r;  
 
-  /* Read the exponent in unary code */
+  /* Read the exponent in unary code */  
   e = bitm_read_unary(arr);
   if (e < 0) return -1;
   r = 0;
@@ -339,12 +360,13 @@ void bitm_write_eg(bitm_array *arr, int n) {
  }
  e--;
  m = (m>>1);
+  
  
  r = (n & m);
   
  /* Write que exponent in unary code */
  bitm_write_unary(arr, e);
- 
+  
  if (e>0) {
    /* Write the remaining binary digits */
    bitm_write_nbits(arr, e, r);
