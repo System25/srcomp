@@ -292,7 +292,7 @@ int bitm_read_unary(bitm_array *arr) {
 void bitm_write_unary(bitm_array *arr, int n) {
   int l;
   
-  for (l=0;l<n;l++) {
+  for (l = 0; l<n; l++) {
     bitm_write_bit(arr, 0);
   }
 
