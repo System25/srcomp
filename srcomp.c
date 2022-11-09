@@ -27,7 +27,7 @@
 
 #define DEFAULT_BLOCK_SIZE 1
 #define VERSION 1
-//#define USE_CHECKSUM
+#define USE_CHECKSUM
 
 #ifdef USE_CHECKSUM
 #include <libiberty/libiberty.h>

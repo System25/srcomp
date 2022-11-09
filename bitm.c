@@ -292,26 +292,10 @@ int bitm_read_unary(bitm_array *arr) {
 void bitm_write_unary(bitm_array *arr, int n) {
   int l;
   
-  l = (BITS_PER_ELEMENT - arr->bit);
-  if (n >= l && l > 0) {
-    bitm_write_nbits(arr, l, 0);
-    n -= l;
+  for (l=0;l<n;l++) {
+    bitm_write_bit(arr, 0);
   }
-  
-  if (arr->bit == BITS_PER_ELEMENT) {
-    arr->data[arr->index++] = arr->current;
-    arr->bit = 0;
-    arr->current = 0;
-  }   
-  
-  while (n >= BITS_PER_ELEMENT) {
-    arr->data[arr->index++] = 0;
-    n -= BITS_PER_ELEMENT;
-  }
-  
-  if (n > 0) {
-    bitm_write_nbits(arr, n, 0);
-  }
+
   bitm_write_bit(arr, 1);
 }
 

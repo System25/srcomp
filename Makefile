@@ -34,7 +34,7 @@ TESTS=\
 	
 
 
-#CFLAGS=-Wall -pg
+#CFLAGS=-Wall -pg -O3
 CFLAGS=-O3
 LDFLAGS=
 
