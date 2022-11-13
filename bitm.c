@@ -15,6 +15,12 @@
 
 #include "bitm.h"
 
+#define USE_FAST_EG
+
+#ifdef USE_FAST_EG
+#include "fast_eg.h"
+#endif
+
 #include <stdio.h>
 
 unsigned int mask[] = { 0x00000000,
@@ -321,6 +327,23 @@ int bitm_read_eg(bitm_array *arr) {
   return (1<<e) | r;
 }
 
+#ifdef USE_FAST_EG
+/** 
+ * Writes a possitive number into the data array using elias gamma coding.
+ * @see https://en.wikipedia.org/wiki/Elias_gamma_coding
+ * @param arr The bitm_array to use. 
+ * @param n The possitive number to write.    
+ */
+void bitm_write_eg(bitm_array *arr, int n) {
+  if (n <=0) {
+    return;
+  }
+  
+  bitm_write_nbits(arr, fastEliasGamma[n-1][1], fastEliasGamma[n-1][0]);
+}
+
+#else
+
 /** 
  * Writes a possitive number into the data array using elias gamma coding.
  * @see https://en.wikipedia.org/wiki/Elias_gamma_coding
@@ -357,4 +380,4 @@ void bitm_write_eg(bitm_array *arr, int n) {
  }
 }
 
-
+#endif
