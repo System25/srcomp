@@ -33,6 +33,11 @@
 #include <libiberty/libiberty.h>
 #endif
 
+/*
+TODO!!! Arreglar cuando no es un número par de bytes (ni múltiplo de 4).
+  También podemos implementar un Elias-Gamma rápido.
+  */
+
 /**
  * File header.
  */
@@ -109,7 +114,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
   sr_header header;
   sr_block_header block_header;
   size_t length, cl;
-  int bs, l;
+  int bs, l, padding;
   int nblocks;
   int i, j;
   unsigned short *src;
@@ -203,13 +208,15 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
   if ( (length % bs) > 0 ) {
     // Code the last block
     bs = (length % bs);
-    if ( (l % 1) == 1 ) {
+    padding = 0;
+    if ( (bs & 1) == 1 ) {
       bs++;
+      padding = 1;
       src[(bs>>1)-1] = 0;
     }
     l = (bs >> 1);
     
-    if (fread(src, 1, bs, infile) != bs) {
+    if (fread(src, 1, bs-padding, infile) != bs-padding) {
       perror("Error reading input data");        
       return -1;
     }
@@ -219,11 +226,11 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     block_header.checksum = xcrc32((unsigned char *) src, bs, 0x80000000);
 #endif	  
     block_header.last_word = src[l-1];
-      
+    
     compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
 
     bitm_reset(bitma);
-    
+          
     for (j = 0; j<bs; j++) {
       bitm_write_eg(bitma, ((unsigned char *)dst)[j] + 1);
     }
@@ -287,7 +294,7 @@ int decompress_data(FILE *infile, FILE *outfile) {
   sr_header header;
   sr_block_header block_header;
   size_t length;
-  int bs, l, cl;
+  int bs, l, cl, padding;
   int nblocks;
   int i, j;
   unsigned short *src;
@@ -393,8 +400,10 @@ int decompress_data(FILE *infile, FILE *outfile) {
   if ( (length % bs) > 0 ) {
     // Code the last block
     bs = (length % bs);
-    if ( (l % 1) == 1 ) {
+    padding = 0;
+    if ( (bs & 1) == 1 ) {
       bs++;
+      padding = 1;
       src[(bs>>1)-1] = 0;
     }
     l = (bs >> 1);
@@ -425,8 +434,8 @@ int decompress_data(FILE *infile, FILE *outfile) {
     }
     
     decompress_block(src, dst, block_header.last_word,
-                     block_header.last_byte, l, use_previous_byte);
-  
+                     block_header.last_byte, l, use_previous_byte);  
+    
 #ifdef USE_CHECKSUM	  
     // Check the checksum
     if (block_header.checksum != xcrc32(
@@ -436,7 +445,7 @@ int decompress_data(FILE *infile, FILE *outfile) {
     }
 #endif	  
       
-    if (fwrite(dst, 1, bs, outfile) != bs) {
+    if (fwrite(dst, 1, bs-padding, outfile) != bs-padding) {
       perror("Error writing data to output file");
       return -1;
     }
