@@ -1,6 +1,21 @@
 # Prerequisites
 *.d
 
+# Automake
+.deps
+Makefile
+Makefile.in
+autom4te.cache
+aclocal.m4
+ar-lib
+compile
+config.log
+config.status
+configure
+depcomp
+install-sh
+missing
+
 # Object files
 *.o
 *.ko

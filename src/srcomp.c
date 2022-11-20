@@ -26,7 +26,7 @@
 #include "bitm.h"
 
 #define DEFAULT_BLOCK_SIZE 1
-#define VERSION 1
+#define INTERNAL_VERSION 1
 #define USE_CHECKSUM
 
 #ifdef USE_CHECKSUM
@@ -72,7 +72,10 @@ void usage() {
   fprintf(stdout, " -i <file>    specify the input file.\n");
   fprintf(stdout, " -o <file>    specify the output file.\n");    
   fprintf(stdout, " -b <size>    specify the block size (in kilobytes).\n");
-    
+  fprintf(stdout, "\n");
+  fprintf(stdout, "Version " VERSION "\n");
+  fprintf(stdout, "Copyright (C) 2022 Abraham Macias Paredes.\n");  
+  fprintf(stdout, "GNU General Public License v3.\n");  
 }
 
 /** 
@@ -150,7 +153,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
   memset(&header, 0, sizeof(header));
   header.magic_number[0] = 'S';
   header.magic_number[1] = 'R';
-  header.version = VERSION;
+  header.version = INTERNAL_VERSION;
   header.length = length;
   header.use_previous_byte = use_previous_byte;
   header.block_size = block_size;
@@ -313,7 +316,7 @@ int decompress_data(FILE *infile, FILE *outfile) {
   }
 
   // Check the version
-  if (header.version != VERSION) {
+  if (header.version != INTERNAL_VERSION) {
     fprintf(stderr, "Wrong version!\n");
     return -1;
   }    
