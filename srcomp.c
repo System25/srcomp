@@ -33,10 +33,7 @@
 #include <libiberty/libiberty.h>
 #endif
 
-/*
-TODO!!! Arreglar cuando no es un número par de bytes (ni múltiplo de 4).
-  También podemos implementar un Elias-Gamma rápido.
-  */
+#define BASE_BLOCK_SIZE 1024
 
 /**
  * File header.
@@ -46,7 +43,7 @@ typedef struct {
     unsigned char version;
     size_t length;
     unsigned char use_previous_byte;
-    unsigned char block_size;
+    unsigned short block_size;
 } sr_header;
 
 /**
@@ -74,7 +71,7 @@ void usage() {
   fprintf(stdout, " -p           use previous data to compress more.\n");    
   fprintf(stdout, " -i <file>    specify the input file.\n");
   fprintf(stdout, " -o <file>    specify the output file.\n");    
-  fprintf(stdout, " -b <size>    specify the block size (in megabytes).\n");
+  fprintf(stdout, " -b <size>    specify the block size (in kilobytes).\n");
     
 }
 
@@ -122,7 +119,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
   bitm_array *bitma;
 
   // Allocate memory
-  bs = block_size * 1024 * 1024;
+  bs = block_size * BASE_BLOCK_SIZE;
   src = (unsigned short *) malloc(bs);
   if (src == NULL) {
     perror("Error allocating memory\n");
@@ -326,7 +323,7 @@ int decompress_data(FILE *infile, FILE *outfile) {
   block_size = header.block_size;      
     
   // Allocate memory
-  bs = block_size * 1024 * 1024;
+  bs = block_size * BASE_BLOCK_SIZE;
   src = (unsigned short *) malloc(bs);
   if (src == NULL) {
     perror("Error allocating memory\n");
@@ -508,8 +505,8 @@ int main(int argc, char *argv[]) {
         break;            
       case 'b':
         block_size = atoi(optarg);
-        if (block_size < 1 || block_size > 64) {
-          fprintf(stderr, "Wrong block size: %s (must be between 1 and 64)\n",
+        if (block_size < 1 || block_size > 65536) {
+          fprintf(stderr, "Wrong block size: %s (must be between 1K and 65536K)\n",
                   optarg);
           return -1;
         }
