@@ -482,7 +482,7 @@ int main(int argc, char *argv[]) {
     switch (opt) {
       case 'h':
         usage();
-        break;
+        return 0;
       case 'c':
         compress = 1;
         break;
