@@ -38,7 +38,6 @@
 typedef struct {
     unsigned char magic_number[2];
     unsigned char version;
-    size_t length;
     unsigned char use_previous_byte;
     unsigned short block_size;
 } sr_header;
@@ -88,10 +87,8 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
                   bool use_previous_byte) {
   sr_header header;
   sr_block_header block_header;
-  size_t length, cl;
+  size_t cl, read;
   int bs, l, padding;
-  int nblocks;
-  int i;
   unsigned short *src;
   unsigned char *dst;
 
@@ -109,84 +106,37 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     free(src);
     return -1;
   }
-  
-  // Calculate the file length
-  fseek(infile, 0L, SEEK_END);
-  length = ftell(infile);
-  rewind(infile);
 
   // Write the file header
   memset(&header, 0, sizeof(header));
   header.magic_number[0] = 'S';
   header.magic_number[1] = 'R';
   header.version = INTERNAL_VERSION;
-  header.length = length;
   header.use_previous_byte = use_previous_byte;
   header.block_size = block_size;
 
   if (fwrite(&header, sizeof(header), 1, outfile) != 1) {
     perror("Error writing file header");
+    free(src);
+    free(dst);
     return -1;
   }
 
   // Code each block
-  nblocks = (length / bs);
-  l = (bs >> 1);
-  for (i = 0; i<nblocks; i++) {
-    if (fread(src, 1, bs, infile) != bs) {
-      perror("Error reading input data");    
-      return -1;
-    }
-    
-    memset(&block_header, 0, sizeof(block_header));
-    block_header.length = bs;
-#ifdef USE_CHECKSUM	  
-    block_header.checksum = xcrc32((unsigned char *) src, bs, 0x80000000);
-#endif	  
-    block_header.last_word = src[l-1];
-    
-        
-    cl = compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
-    
-    if (cl < 0) {
-      fprintf(stderr, "Error compressing data block!\n");
-      return -1;        
-    }
-    
-    block_header.compressed_length = cl;
-    
-    if (fwrite(&block_header, sizeof(block_header), 1, outfile) != 1) {
-      perror("Error writing block header");
-      return -1;
-    }
-    
-    
-    if (fwrite(dst, 1, cl, outfile) != cl) {
-      perror("Error writing data to output file");
-      return -1;
-    }
-
-  }
-
-  if ( (length % bs) > 0 ) {
-    // Code the last block
-    bs = (length % bs);
+  read = fread(src, 1, bs, infile);
+  while (read > 0) {
+    // If the number of bytes read is odd we need 1 byte of padding
     padding = 0;
-    if ( (bs & 1) == 1 ) {
-      bs++;
+    if ( (read & 1) == 1 ) {
       padding = 1;
-      src[(bs>>1)-1] = 0;
-    }
-    l = (bs >> 1);
+      src[((read+padding)>>1)-1] = 0;
+    }    
+    l = ((read+padding) >> 1);
     
-    if (fread(src, 1, bs-padding, infile) != bs-padding) {
-      perror("Error reading input data");        
-      return -1;
-    }
-    
-    block_header.length = bs;
+    // Compress block
+    block_header.length = read;
 #ifdef USE_CHECKSUM	  
-    block_header.checksum = xcrc32((unsigned char *) src, bs, 0x80000000);
+    block_header.checksum = xcrc32((unsigned char *) src, read, 0x80000000);
 #endif	  
     block_header.last_word = src[l-1];
     
@@ -194,21 +144,38 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
 
     if (cl < 0) {
       fprintf(stderr, "Error compressing data block!\n");
+      free(src);
+      free(dst);      
       return -1;        
     }    
     
     block_header.compressed_length = cl;
     
+    // Write block header
     if (fwrite(&block_header, sizeof(block_header), 1, outfile) != 1) {
       perror("Error writing block header");
+      free(src);
+      free(dst);      
       return -1;
     }
     
+    // Write compressed block
     if (fwrite(dst, 1, cl, outfile) != cl) {
       perror("Error writing data to output file");
+      free(src);
+      free(dst);      
       return -1;
-    }
-    
+    }    
+  
+    // read next block to compress
+    read = fread(src, 1, bs, infile);
+  }
+  
+  if (read < 0)  {
+    perror("Error reading input data");
+    free(src);
+    free(dst);
+    return -1;
   }
   
   // Release memory
@@ -229,10 +196,8 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
 int decompress_data(FILE *infile, FILE *outfile) {
   sr_header header;
   sr_block_header block_header;
-  size_t length, decompressed_length;
-  int bs, l, cl, padding;
-  int nblocks;
-  int i;
+  size_t decompressed_length, read;
+  int bs, l, cl;
   unsigned char *src;
   unsigned short *dst;
   int block_size;
@@ -255,8 +220,7 @@ int decompress_data(FILE *infile, FILE *outfile) {
     fprintf(stderr, "Wrong version!\n");
     return -1;
   }    
-    
-  length = header.length;
+  
   use_previous_byte = header.use_previous_byte;
   block_size = header.block_size;      
     
@@ -275,108 +239,60 @@ int decompress_data(FILE *infile, FILE *outfile) {
     return -1;
   }
 
-  // Decode each block
-  nblocks = (length / bs);
-  l = (bs >> 1);
-  for (i = 0; i<nblocks; i++) {
-    // Read the block header
-    if (fread(&block_header, sizeof(block_header), 1, infile) != 1) {
-      perror("Error reading block header");
-      return -1;
-    }      
-
-    // Check the magic number
-    if (block_header.length != bs) {
-      fprintf(stderr, "Bad block size!\n");
-      return -1;
-    }    
-    
-    cl = block_header.compressed_length;
-    
-    // Read input data
-    if (fread(src, 1, cl, infile) != cl) {
-      perror("Error reading input data");    
-      return -1;
-    }
-    
-    decompressed_length = decompress_block(src, dst, block_header.last_word,
-                     block_header.last_byte, l, use_previous_byte);
+  // Read the block header
+  read = fread(&block_header, sizeof(block_header), 1, infile);
   
-    if (decompressed_length < 0) {
-      fprintf(stderr, "Error decompressing data block!\n");
-      return -1;        
-    }
-    
-#ifdef USE_CHECKSUM	  
-    // Check the checksum
-    if (block_header.checksum != xcrc32(
-          (unsigned char *) dst, bs, 0x80000000)) {
-      fprintf(stderr, "Bad checksum!\n");
-      return -1;        
-    }
-#endif	  
-      
-    if (fwrite(dst, 1, bs, outfile) != bs) {
-      perror("Error writing data to output file");
-      return -1;
-    }
-
-  }
-
-  if ( (length % bs) > 0 ) {
-    // Code the last block
-    bs = (length % bs);
-    padding = 0;
-    if ( (bs & 1) == 1 ) {
-      bs++;
-      padding = 1;
-      src[(bs>>1)-1] = 0;
-    }
-    l = (bs >> 1);
-    
-    // Read the block header
-    if (fread(&block_header, sizeof(block_header), 1, infile) != 1) {
-      perror("Error reading block header");
-      return -1;
-    }      
-
-    // Check the magic number
-    if (block_header.length != bs) {
-      fprintf(stderr, "Bad block size!\n");
-      return -1;
-    }    
-    
-    cl = block_header.compressed_length;
+  while (read > 0) {
+    cl = block_header.compressed_length;    
     
     // Read input data
     if (fread(src, 1, cl, infile) != cl) {
-      perror("Error reading input data");    
+      perror("Error reading input data");
+      free(src);
+      free(dst);      
       return -1;
     }
     
-    
+    // Decompress the data
+    l = (block_header.length >> 1) + (block_header.length & 1);
     decompressed_length = decompress_block(src, dst, block_header.last_word,
                      block_header.last_byte, l, use_previous_byte);  
 
     if (decompressed_length < 0) {
       fprintf(stderr, "Error decompressing data block!\n");
+      free(src);
+      free(dst);      
       return -1;        
     }    
     
 #ifdef USE_CHECKSUM	  
     // Check the checksum
     if (block_header.checksum != xcrc32(
-          (unsigned char *) dst, bs, 0x80000000)) {
+          (unsigned char *) dst, block_header.length, 0x80000000)) {
       fprintf(stderr, "Bad checksum!\n");
+      free(src);
+      free(dst);      
       return -1;        
     }
 #endif	  
       
-    if (fwrite(dst, 1, bs-padding, outfile) != bs-padding) {
+    // Write the decompressed block data into the output file
+    if (fwrite(dst, 1, block_header.length, outfile) != block_header.length) {
       perror("Error writing data to output file");
+      free(src);
+      free(dst);       
       return -1;
     }
-    
+  
+    // Read the next block header
+    read = fread(&block_header, sizeof(block_header), 1, infile);    
+  }
+  
+  if (read < 0) {
+    perror("Error reading block header");
+    free(src);
+    free(dst);    
+    return -1;
   }
 
   // Release memory

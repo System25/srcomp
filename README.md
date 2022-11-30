@@ -57,26 +57,26 @@ USAGE: srcomp [c|d] -i <input_file> -o <output_file>
 ## Compressing a file
 You can compress a file by running it like:
 ```
-./srcomp -c -i ../../enwik8 -o enwik8.srz
+./srcomp -c -i enwik8 -o enwik8.srz
 ```
 
 Or alternatively, you can compress the file by using stdin
 and stdout:
 ```
-./srcomp -c -i ../../enwik8 > enwik8.srz
+cat enwik8 | ./srcomp -c > enwik8.srz
 ```
 
 In compression mode, you can choose how big do you want the block size to be
 (up to 64 megabytes). The bigger the block size the better the compression.
 ```
 # Example with 1Mb block size
-./srcomp -c -b 1024 -i ../../enwik8 -o enwik8.srz
+./srcomp -c -b 1024 -i enwik8 -o enwik8.srz
 ```
 
 You can also use the previous data to compress a little bit more.
 ```
 # Example with 1Mb block size and previous data usage
-./srcomp -c -p -b 1024 -i ../../enwik8 -o enwik8.srz
+./srcomp -c -p -b 1024 -i enwik8 -o enwik8.srz
 ```
 
 ## Decompressing a file
