@@ -149,6 +149,12 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
       return -1;        
     }    
     
+    // If the data can't be compressed, just store it
+    if (cl >= read) {
+      memcpy(dst, src, read);
+      cl = read;
+    }
+    
     block_header.compressed_length = cl;
     
     // Write block header
@@ -253,17 +259,25 @@ int decompress_data(FILE *infile, FILE *outfile) {
       return -1;
     }
     
+    if (cl == block_header.length) {
+      // The data is not compressed
+      memcpy(dst, src, block_header.length);
+    }
+    else {
     // Decompress the data
-    l = (block_header.length >> 1) + (block_header.length & 1);
-    decompressed_length = decompress_block(src, dst, block_header.last_word,
-                     block_header.last_byte, l, use_previous_byte);  
+      l = (block_header.length >> 1) + (block_header.length & 1);
+      decompressed_length = decompress_block(src, dst, block_header.last_word,
+                       block_header.last_byte, l, use_previous_byte);  
 
-    if (decompressed_length < 0) {
-      fprintf(stderr, "Error decompressing data block!\n");
-      free(src);
-      free(dst);      
-      return -1;        
-    }    
+      if (decompressed_length < 0) {
+        fprintf(stderr, "Error decompressing data block!\n");
+        free(src);
+        free(dst);      
+        return -1;        
+      }
+    }
+    
+
     
 #ifdef USE_CHECKSUM	  
     // Check the checksum
