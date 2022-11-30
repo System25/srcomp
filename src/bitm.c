@@ -76,6 +76,21 @@ bitm_array *bitm_wrap(ELEMENT *data, size_t length) {
 
 /* ======================================================================== */
 /** 
+ * Unwrap an array of elements. 
+ * @param arr The bitm_array to unwrap.
+ */
+void bitm_unwrap(bitm_array *arr) {
+  if (arr == NULL) {
+    return;
+  }  
+
+  arr->data = NULL;
+  bitm_free(arr);
+}
+
+
+/* ======================================================================== */
+/** 
  * Resets the internal status of the data array.
  * @param arr The bitm_array to use.
  */

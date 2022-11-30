@@ -20,10 +20,7 @@
 #include <stdbool.h>
 #include <libiberty/libiberty.h>
 
-#include "wseparator.h"
-#include "split2b.h"
-#include "mtf.h"
-#include "bitm.h"
+#include "srz.h"
 
 #define DEFAULT_BLOCK_SIZE 1
 #define INTERNAL_VERSION 1
@@ -78,28 +75,6 @@ void usage() {
   fprintf(stdout, "GNU General Public License v3.\n");  
 }
 
-/** 
- * Compress a data block. 
- * @param src The source array of words (to be separated into groups).
- * @param dst The destination array of words.
- * @param length The number of words in the source array.
- * @param last_byte Value of the last byte (before second separation). 
- * @param use_previous_byte Use the median value of the previous byte
- *                          to achieve a better sorting.
- */
-void compress_block(unsigned short *src, unsigned short *dst, size_t length,
-                    unsigned char *last_byte, bool use_previous_byte) {
-  mtf_status status;
-  
-  mtf_reset(&status);
-  
-  separate_words(src, dst, length, use_previous_byte);
-  *last_byte = ((unsigned char *) dst)[(length<<1) - 1];
-  separate_bytes(dst, (unsigned char *) src, length);
-  mtf_code((unsigned char *) src, (unsigned char *) dst, (length << 1),
-           &status); 
-}
-
 /* ======================================================================== */
 /** 
  * Compress the input file into the output file.
@@ -116,10 +91,9 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
   size_t length, cl;
   int bs, l, padding;
   int nblocks;
-  int i, j;
+  int i;
   unsigned short *src;
-  unsigned short *dst;
-  bitm_array *bitma;
+  unsigned char *dst;
 
   // Allocate memory
   bs = block_size * BASE_BLOCK_SIZE;
@@ -129,20 +103,12 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     return -1;
   }
     
-  dst = (unsigned short *) malloc(bs);
+  dst = (unsigned char *) malloc(bs);
   if (dst == NULL) {
     perror("Error allocating memory\n");
     free(src);
     return -1;
   }
-
-  bitma = bitm_alloc(bs / sizeof(ELEMENT));
-  if (bitma == NULL) {
-    perror("Error allocating memory\n");
-    free(src);
-    free(dst);
-    return -1;
-  }  
   
   // Calculate the file length
   fseek(infile, 0L, SEEK_END);
@@ -180,16 +146,13 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     block_header.last_word = src[l-1];
     
         
-    compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
+    cl = compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
     
-    bitm_reset(bitma);
-    
-    for (j = 0; j<bs; j++) {
-      bitm_write_eg(bitma, ((unsigned char *)dst)[j] + 1);
+    if (cl < 0) {
+      fprintf(stderr, "Error compressing data block!\n");
+      return -1;        
     }
     
-    bitm_flush(bitma);
-    cl = bitm_get_index(bitma);
     block_header.compressed_length = cl;
     
     if (fwrite(&block_header, sizeof(block_header), 1, outfile) != 1) {
@@ -198,7 +161,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     }
     
     
-    if (fwrite(bitm_get_data(bitma), sizeof(ELEMENT), cl, outfile) != cl) {
+    if (fwrite(dst, 1, cl, outfile) != cl) {
       perror("Error writing data to output file");
       return -1;
     }
@@ -227,16 +190,13 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
 #endif	  
     block_header.last_word = src[l-1];
     
-    compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
+    cl = compress_block(src, dst, l, &block_header.last_byte, use_previous_byte);
 
-    bitm_reset(bitma);
-          
-    for (j = 0; j<bs; j++) {
-      bitm_write_eg(bitma, ((unsigned char *)dst)[j] + 1);
-    }
+    if (cl < 0) {
+      fprintf(stderr, "Error compressing data block!\n");
+      return -1;        
+    }    
     
-    bitm_flush(bitma);
-    cl = bitm_get_index(bitma);
     block_header.compressed_length = cl;
     
     if (fwrite(&block_header, sizeof(block_header), 1, outfile) != 1) {
@@ -244,7 +204,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
       return -1;
     }
     
-    if (fwrite(bitm_get_data(bitma), sizeof(ELEMENT), cl, outfile) != cl) {
+    if (fwrite(dst, 1, cl, outfile) != cl) {
       perror("Error writing data to output file");
       return -1;
     }
@@ -254,34 +214,10 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
   // Release memory
   free(src);
   free(dst);
-  bitm_free(bitma);
     
   return 0;
 }
 
-/* ======================================================================== */
-/** 
- * Decompress a data block.
- * @param src The source array of words (to be joined from groups).
- * @param dst The destination array of words.
- * @param last_word Value of the last word (before separation).
- * @param last_byte Value of the last byte (before second separation).
- * @param length The number of words in the source array.
- * @param use_previous_byte Use the median value of the previous byte
- *                          to achieve a better sorting.
- */
-void decompress_block(unsigned short *src, unsigned short *dst,
-                      unsigned short last_word, unsigned char last_byte,
-                      size_t length, bool use_previous_byte) {
-  mtf_status status;
-  
-  mtf_reset(&status);
-  
-  mtf_decode((unsigned char *) src, (unsigned char *) dst, (length<<1),
-             &status);
-  join_bytes((unsigned char *) dst, src, last_byte, length);
-  join_words(src, dst, last_word, length, use_previous_byte);
-}
 
 /* ======================================================================== */
 /** 
@@ -293,15 +229,14 @@ void decompress_block(unsigned short *src, unsigned short *dst,
 int decompress_data(FILE *infile, FILE *outfile) {
   sr_header header;
   sr_block_header block_header;
-  size_t length;
+  size_t length, decompressed_length;
   int bs, l, cl, padding;
   int nblocks;
-  int i, j;
-  unsigned short *src;
+  int i;
+  unsigned char *src;
   unsigned short *dst;
   int block_size;
   bool use_previous_byte;
-  bitm_array *bitma;
 
   // Read the file header
   if (fread(&header, sizeof(header), 1, infile) != 1) {
@@ -327,7 +262,7 @@ int decompress_data(FILE *infile, FILE *outfile) {
     
   // Allocate memory
   bs = block_size * BASE_BLOCK_SIZE;
-  src = (unsigned short *) malloc(bs);
+  src = (unsigned char *) malloc(bs);
   if (src == NULL) {
     perror("Error allocating memory\n");
     return -1;
@@ -340,14 +275,6 @@ int decompress_data(FILE *infile, FILE *outfile) {
     return -1;
   }
 
-  bitma = bitm_alloc(bs / sizeof(ELEMENT));
-  if (bitma == NULL) {
-    perror("Error allocating memory\n");
-    free(src);
-    free(dst);
-    return -1;
-  }
-  
   // Decode each block
   nblocks = (length / bs);
   l = (bs >> 1);
@@ -365,22 +292,21 @@ int decompress_data(FILE *infile, FILE *outfile) {
     }    
     
     cl = block_header.compressed_length;
-    bitm_reset(bitma);
     
     // Read input data
-    if (fread(bitm_get_data(bitma), sizeof(ELEMENT), cl, infile) != cl) {
+    if (fread(src, 1, cl, infile) != cl) {
       perror("Error reading input data");    
       return -1;
     }
     
-    for (j = 0; j<bs; j++) {
-      ((unsigned char *)src)[j] = (unsigned char) (bitm_read_eg(bitma) - 1);
-    }
-    
-    
-    decompress_block(src, dst, block_header.last_word,
+    decompressed_length = decompress_block(src, dst, block_header.last_word,
                      block_header.last_byte, l, use_previous_byte);
   
+    if (decompressed_length < 0) {
+      fprintf(stderr, "Error decompressing data block!\n");
+      return -1;        
+    }
+    
 #ifdef USE_CHECKSUM	  
     // Check the checksum
     if (block_header.checksum != xcrc32(
@@ -421,20 +347,21 @@ int decompress_data(FILE *infile, FILE *outfile) {
     }    
     
     cl = block_header.compressed_length;
-    bitm_reset(bitma);
     
     // Read input data
-    if (fread(bitm_get_data(bitma), sizeof(ELEMENT), cl, infile) != cl) {
+    if (fread(src, 1, cl, infile) != cl) {
       perror("Error reading input data");    
       return -1;
     }
     
-    for (j = 0; j<bs; j++) {
-      ((unsigned char *)src)[j] = (unsigned char) (bitm_read_eg(bitma) - 1);
-    }
     
-    decompress_block(src, dst, block_header.last_word,
+    decompressed_length = decompress_block(src, dst, block_header.last_word,
                      block_header.last_byte, l, use_previous_byte);  
+
+    if (decompressed_length < 0) {
+      fprintf(stderr, "Error decompressing data block!\n");
+      return -1;        
+    }    
     
 #ifdef USE_CHECKSUM	  
     // Check the checksum
@@ -455,7 +382,6 @@ int decompress_data(FILE *infile, FILE *outfile) {
   // Release memory
   free(src);
   free(dst);
-  bitm_free(bitma);
     
   return 0;
 }
