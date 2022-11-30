@@ -100,7 +100,7 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     return -1;
   }
     
-  dst = (unsigned char *) malloc(bs);
+  dst = (unsigned char *) malloc(bs<<1);  // dst array size = bs*2
   if (dst == NULL) {
     perror("Error allocating memory\n");
     free(src);
@@ -129,8 +129,8 @@ int compress_data(FILE *infile, FILE *outfile, int block_size,
     padding = 0;
     if ( (read & 1) == 1 ) {
       padding = 1;
-      src[((read+padding)>>1)-1] = 0;
-    }    
+      ((unsigned char *)src)[read + 1] = 0;
+    }
     l = ((read+padding) >> 1);
     
     // Compress block
@@ -226,7 +226,7 @@ int decompress_data(FILE *infile, FILE *outfile) {
     
   // Allocate memory
   bs = block_size * BASE_BLOCK_SIZE;
-  src = (unsigned char *) malloc(bs);
+  src = (unsigned char *) malloc(bs<<1); // source array size = bs*2
   if (src == NULL) {
     perror("Error allocating memory\n");
     return -1;

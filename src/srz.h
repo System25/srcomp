@@ -22,8 +22,8 @@
 /** 
  * Compress a data block. 
  * @param src The source array of words (to be compressed).
- * @param dst The destination array of bytes (its size must be a multiple of 4
- *            and it must be bigger than the source array size).
+ * @param dst The destination array of bytes (its size must be double the
+ *            source array size).
  * @param length The number of words in the source array.
  * @param last_byte Value of the last byte (before second separation). 
  * @param use_previous_byte Use the median value of the previous byte

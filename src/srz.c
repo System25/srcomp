@@ -26,8 +26,8 @@
 /** 
  * Compress a data block. 
  * @param src The source array of words (to be compressed).
- * @param dst The destination array of bytes (its size must be a multiple of 4
- *            and it must be bigger than the source array size).
+ * @param dst The destination array of bytes (its size must be double the
+ *            source array size).
  * @param length The number of words in the source array.
  * @param last_byte Value of the last byte (before second separation). 
  * @param use_previous_byte Use the median value of the previous byte
@@ -57,11 +57,8 @@ size_t compress_block(unsigned short *src, unsigned char *dst, size_t length,
     return -1;
   }  
   
-  l = (length>>2);
-  if ( (length & 3) != 0 ) {
-    l++;
-  }
-  
+  // destination array size = 2 x source array size
+  l = (length>>1);
   bitma = bitm_wrap((ELEMENT *)dst, l); 
   
   mtf_reset(&status);
@@ -132,11 +129,8 @@ size_t decompress_block(unsigned char *src, unsigned short *dst,
     return -1;
   }  
   
-  l = (length>>2);
-  if ( (length & 3) != 0 ) {
-    l++;
-  }
-  
+  // source array size = 2 x destination array size
+  l = (length>>1);
   bitma = bitm_wrap((ELEMENT *)src, l); 
   
   mtf_reset(&status);
